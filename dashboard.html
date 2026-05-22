@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arb Detector — Kalshi × Polymarket</title>
+  <style>
+    :root {
+      --bg:          #f2f2f7;
+      --surface:     #ffffff;
+      --surface-2:   #f8f8fb;
+      --text:        #1c1c1e;
+      --text-2:      #48484a;
+      --text-3:      #8e8e93;
+      --border:      rgba(60,60,67,0.10);
+      --green:       #34c759;
+      --green-dim:   #e8faed;
+      --amber:       #ff9f0a;
+      --amber-dim:   #fff6e5;
+      --red:         #ff3b30;
+      --blue:        #007aff;
+      --purple:      #5856d6;
+      --radius:      14px;
+      --radius-sm:   8px;
+      --shadow:      0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(242,242,247,0.82);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-icon {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .header-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .header-sub {
+      font-size: 12px;
+      color: var(--text-3);
+      letter-spacing: 0;
+    }
+    .live-badge {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--green-dim);
+      color: #1a7a30;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .refresh-info {
+      font-size: 11px;
+      color: var(--text-3);
+      text-align: right;
+    }
+
+    /* ── Stats grid ───────────────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      padding: 16px 24px 0;
+    }
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(3, 1fr); }
+    }
+    .stat {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.amber  { color: var(--amber); }
+    .stat-value.blue   { color: var(--blue);  }
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 1px;
+    }
+
+    /* ── Main content ─────────────────────────────────────────────────────── */
+    .content { padding: 14px 24px 40px; }
+
+    /* ── Alert banner ─────────────────────────────────────────────────────── */
+    .arb-alert {
+      display: none;
+      background: var(--green-dim);
+      border: 1px solid rgba(52, 199, 89, 0.25);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .arb-alert.visible { display: block; }
+    .arb-alert-header {
+      font-weight: 600;
+      color: #1a7a30;
+      font-size: 13px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .arb-cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .arb-card {
+      background: white;
+      border: 1px solid rgba(52,199,89,0.3);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      min-width: 280px;
+      flex: 1;
+    }
+    .arb-card-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .arb-card-strategy {
+      font-size: 11px;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    .arb-card-profit {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+    .arb-card-note { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+
+    /* ── Table card ───────────────────────────────────────────────────────── */
+    .table-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .table-toolbar {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .table-toolbar-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .filter-group { display: flex; gap: 6px; }
+    .filter-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover   { background: var(--bg); }
+    .filter-btn.active  {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: white;
+    }
+    .search-input {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      outline: none;
+      width: 180px;
+    }
+    .search-input:focus { border-color: var(--blue); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead th {
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { color: var(--text-2); }
+    thead th.sorted { color: var(--blue); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(0,0,0,0.018); }
+    tbody tr.is-arb { background: var(--green-dim); }
+    tbody tr.is-arb:hover { background: #dcf7e4; }
+    tbody tr.near-arb { background: var(--amber-dim); }
+
+    td {
+      padding: 9px 12px;
+      vertical-align: middle;
+    }
+
+    .market-title { font-size: 12px; font-weight: 500; color: var(--text); }
+    .market-sub   { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    .mkt-link     {
+      color: inherit;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .mkt-link:hover { color: var(--blue); }
+    .platform-tag {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+    .tag-k  { background: #e5f0ff; color: #0055cc; }
+    .tag-pm { background: #f0e6ff; color: #5205b8; }
+
+    .price-cell { font-size: 12px; font-variant-numeric: tabular-nums; }
+    .price-yes  { color: var(--text); font-weight: 500; }
+    .price-no   { color: var(--text-3); font-size: 11px; }
+    .price-spread {
+      font-size: 10px;
+      display: inline-block;
+      padding: 1px 4px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+    .spread-pos { background: #e5f5ec; color: #1a7a30; }
+    .spread-neg { background: #ffe5e5; color: #c00; }
+
+    .sim-bar {
+      display: inline-block;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--blue);
+      opacity: 0.5;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    .sim-val { font-size: 11px; color: var(--text-3); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .badge-arb    { background: var(--green-dim); color: #1a7a30;  }
+    .badge-near   { background: var(--amber-dim); color: #a05e00; }
+    .badge-none   { background: transparent; color: var(--text-3); }
+    .badge-dot    { width: 5px; height: 5px; border-radius: 50%; }
+    .badge-arb .badge-dot  { background: var(--green); }
+    .badge-near .badge-dot { background: var(--amber); }
+
+    .profit-cell {
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .profit-pos { color: var(--green); }
+    .profit-neg { color: var(--text-3); }
+
+    .strategy-text {
+      font-size: 10.5px;
+      color: var(--text-3);
+      white-space: nowrap;
+    }
+
+    /* ── Empty state ──────────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-3);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 12px; }
+    .empty-title { font-size: 16px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+    .empty-sub   { font-size: 13px; }
+
+    /* ── Error banner ─────────────────────────────────────────────────────── */
+    .error-bar {
+      display: none;
+      background: #fff2f2;
+      border: 1px solid rgba(255,59,48,0.2);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 12px;
+    }
+    .error-bar.visible { display: block; }
+
+    /* ── Disclaimer ───────────────────────────────────────────────────────── */
+    .disclaimer {
+      margin-top: 24px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-3);
+      line-height: 1.6;
+    }
+    .disclaimer strong { color: var(--text-2); }
+
+    /* ── Loading skeleton ─────────────────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, #e8e8ed 25%, #f0f0f5 50%, #e8e8ed 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skeleton-row td { padding: 14px 12px; }
+    .skeleton-block  { height: 12px; }
+
+    /* ── Vol chip ─────────────────────────────────────────────────────────── */
+    .vol-chip {
+      font-size: 10px;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-icon">⚖️</div>
+    <div>
+      <div class="header-title">Arb Detector</div>
+      <div class="header-sub">Kalshi × Polymarket</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge" id="liveBadge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="refresh-info">
+      <div id="lastUpdate">Connecting…</div>
+      <div id="nextRefresh"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ── STATS ───────────────────────────────────────────────────────────────── -->
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label">Kalshi</div>
+    <div class="stat-value blue" id="statKalshi">—</div>
+    <div class="stat-sub">open markets</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Polymarket</div>
+    <div class="stat-value" id="statPoly" style="color:var(--purple)">—</div>
+    <div class="stat-sub">active markets</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Matched</div>
+    <div class="stat-value" id="statMatched">—</div>
+    <div class="stat-sub">contract pairs</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Arb Ops</div>
+    <div class="stat-value green" id="statArb">—</div>
+    <div class="stat-sub">fee-adjusted</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Fees</div>
+    <div class="stat-value" style="font-size:14px;line-height:1.8;color:var(--text-2)">
+      K 7% win · PM 2% trade
+    </div>
+    <div class="stat-sub">applied in calc</div>
+  </div>
+</div>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────────────────────────── -->
+<div class="content" style="margin-top:14px;">
+
+  <!-- Error -->
+  <div class="error-bar" id="errorBar"></div>
+
+  <!-- Arb opportunities highlight -->
+  <div class="arb-alert" id="arbAlert">
+    <div class="arb-alert-header">⚡ Arbitrage Opportunities</div>
+    <div class="arb-cards" id="arbCards"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <div class="table-toolbar-title" id="tableTitle">Matched Markets</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all"   onclick="setFilter('all')">All</button>
+          <button class="filter-btn"         data-filter="arb"   onclick="setFilter('arb')">Arb Only</button>
+          <button class="filter-btn"         data-filter="near"  onclick="setFilter('near')">Near-Arb</button>
+        </div>
+        <input
+          class="search-input"
+          type="text"
+          placeholder="Filter markets…"
+          oninput="setSearch(this.value)"
+        />
+      </div>
+    </div>
+    <div id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34%"  onclick="sortBy('title')">Market</th>
+            <th style="width:12%"  onclick="sortBy('k_yes')">Kalshi YES / NO</th>
+            <th style="width:12%"  onclick="sortBy('pm_yes')">Poly YES / NO</th>
+            <th style="width:8%"   onclick="sortBy('spread')">YES Spread</th>
+            <th style="width:7%"   onclick="sortBy('sim')">Match</th>
+            <th style="width:14%"  onclick="sortBy('profit')">Best Strategy</th>
+            <th style="width:8%"   onclick="sortBy('profit')">Min Profit</th>
+            <th style="width:5%">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- skeleton rows while loading -->
+          <tr class="skeleton-row">
+            <td><div class="skeleton skeleton-block" style="width:85%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:60%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:60%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:40%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:40%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:70%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:50%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:30%"></div></td>
+          </tr>
+          <tr class="skeleton-row">
+            <td><div class="skeleton skeleton-block" style="width:70%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:60%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:60%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:40%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:40%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:70%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:50%"></div></td>
+            <td><div class="skeleton skeleton-block" style="width:30%"></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <strong>Informational only.</strong>
+    Prices reflect public API data and may lag real-time order books.
+    Kalshi fee model: 7 % of net profit at settlement.
+    Polymarket fee model: 2 % taker fee on trade value.
+    Thin markets, slippage, and execution delays can eliminate apparent opportunities.
+    Market matching uses text-similarity heuristics — verify contract terms before trading.
+    This tool does not constitute financial advice.
+  </div>
+
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let allPairs   = [];
+let filterMode = 'all';
+let searchTerm = '';
+let sortKey    = 'profit';
+let sortDir    = -1;   // -1 = descending
+let lastTs     = 0;
+let refreshIn  = 10;
+
+// ── SSE Connection ─────────────────────────────────────────────────────────────
+const es = new EventSource('/stream');
+
+es.addEventListener('update', e => {
+  const d = JSON.parse(e.data);
+
+  // Stats
+  document.getElementById('statKalshi').textContent  = d.kalshi_n.toLocaleString();
+  document.getElementById('statPoly').textContent    = d.poly_n.toLocaleString();
+  document.getElementById('statMatched').textContent = d.matched_n.toLocaleString();
+
+  const arbEl = document.getElementById('statArb');
+  arbEl.textContent = d.arb_n.toLocaleString();
+  arbEl.className   = 'stat-value ' + (d.arb_n > 0 ? 'green' : '');
+
+  // Timestamp
+  const ago = new Date(d.ts * 1000);
+  document.getElementById('lastUpdate').textContent =
+    'Updated ' + ago.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  refreshIn = 10;
+
+  // Error
+  const errBar = document.getElementById('errorBar');
+  if (d.error) {
+    errBar.textContent = '⚠ ' + d.error;
+    errBar.classList.add('visible');
+  } else {
+    errBar.classList.remove('visible');
+  }
+
+  // Store and render
+  allPairs = d.pairs || [];
+  lastTs   = d.ts;
+  renderArbAlert(allPairs);
+  renderTable();
+});
+
+es.onerror = () => {
+  document.getElementById('liveBadge').style.opacity = '0.4';
+  document.getElementById('lastUpdate').textContent  = 'Disconnected — retrying…';
+};
+
+// ── Countdown timer ────────────────────────────────────────────────────────────
+setInterval(() => {
+  refreshIn = Math.max(0, refreshIn - 1);
+  document.getElementById('nextRefresh').textContent =
+    refreshIn > 0 ? `Next refresh in ${refreshIn}s` : 'Refreshing…';
+}, 1000);
+
+// ── Arb Alert ─────────────────────────────────────────────────────────────────
+function renderArbAlert(pairs) {
+  const arbs = pairs.filter(p => p.arb.has_arb);
+  const alert = document.getElementById('arbAlert');
+  const cards = document.getElementById('arbCards');
+
+  if (arbs.length === 0) {
+    alert.classList.remove('visible');
+    return;
+  }
+  alert.classList.add('visible');
+
+  cards.innerHTML = arbs.slice(0, 6).map(p => {
+    const bestStrat = p.arb.A.profit_pct >= p.arb.B.profit_pct ? p.arb.A : p.arb.B;
+    const title = trunc(p.kalshi.title, 55);
+    return `
+      <div class="arb-card">
+        <div class="arb-card-title">${esc(title)}</div>
+        <div class="arb-card-strategy">${esc(bestStrat.strategy)}</div>
+        <div class="arb-card-profit">+${bestStrat.profit_pct.toFixed(2)}%</div>
+        <div class="arb-card-note">
+          Cost $${bestStrat.cost.toFixed(3)} ·
+          P&L YES ${fmtPnl(bestStrat.pnl_if_yes)} ·
+          P&L NO ${fmtPnl(bestStrat.pnl_if_no)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Filter / Search ────────────────────────────────────────────────────────────
+function setFilter(f) {
+  filterMode = f;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  renderTable();
+}
+function setSearch(v) { searchTerm = v.toLowerCase(); renderTable(); }
+
+// ── Sort ───────────────────────────────────────────────────────────────────────
+function sortBy(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = -1; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  renderTable();
+}
+
+function sortedPairs(pairs) {
+  return [...pairs].sort((a, b) => {
+    let va, vb;
+    switch (sortKey) {
+      case 'profit':
+        va = a.arb.best_profit_pct; vb = b.arb.best_profit_pct; break;
+      case 'k_yes':
+        va = a.kalshi.yes_ask; vb = b.kalshi.yes_ask; break;
+      case 'pm_yes':
+        va = a.poly.yes_ask; vb = b.poly.yes_ask; break;
+      case 'spread':
+        va = Math.abs(a.arb.yes_spread); vb = Math.abs(b.arb.yes_spread); break;
+      case 'sim':
+        va = a.sim; vb = b.sim; break;
+      default:
+        va = a.kalshi.title; vb = b.kalshi.title;
+        return sortDir * va.localeCompare(vb);
+    }
+    return sortDir * (va - vb);
+  });
+}
+
+// ── Table render ───────────────────────────────────────────────────────────────
+function renderTable() {
+  let pairs = allPairs;
+
+  // Filter
+  if (filterMode === 'arb')  pairs = pairs.filter(p => p.arb.has_arb);
+  if (filterMode === 'near') pairs = pairs.filter(p =>
+    !p.arb.has_arb && p.arb.best_profit_pct > -3
+  );
+
+  // Search
+  if (searchTerm) {
+    pairs = pairs.filter(p =>
+      p.kalshi.title.toLowerCase().includes(searchTerm) ||
+      p.poly.title.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  document.getElementById('tableTitle').textContent =
+    `Matched Markets (${pairs.length})`;
+
+  pairs = sortedPairs(pairs);
+
+  if (pairs.length === 0) {
+    document.getElementById('tableBody').innerHTML = `
+      <tr><td colspan="8">
+        <div class="empty">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-title">${allPairs.length === 0 ? 'Loading data…' : 'No matches'}</div>
+          <div class="empty-sub">${allPairs.length === 0 ? 'First poll in progress' : 'Try a different filter'}</div>
+        </div>
+      </td></tr>`;
+    return;
+  }
+
+  const rows = pairs.map(p => {
+    const k  = p.kalshi;
+    const pm = p.poly;
+    const arb = p.arb;
+
+    // Pick best strategy
+    const bestStrat = arb.A.profit_pct >= arb.B.profit_pct ? arb.A : arb.B;
+    const isArb  = arb.has_arb;
+    const isNear = !isArb && arb.best_profit_pct > -3;
+
+    const rowClass = isArb ? 'is-arb' : (isNear ? 'near-arb' : '');
+
+    // Status badge
+    let badge;
+    if (isArb) {
+      badge = `<span class="badge badge-arb"><span class="badge-dot"></span>ARB</span>`;
+    } else if (isNear) {
+      badge = `<span class="badge badge-near"><span class="badge-dot"></span>NEAR</span>`;
+    } else {
+      badge = `<span class="badge badge-none">—</span>`;
+    }
+
+    // Spread chip
+    const spread = arb.yes_spread;
+    const spreadClass = spread > 0 ? 'spread-pos' : (spread < 0 ? 'spread-neg' : '');
+    const spreadText  = spread > 0 ? `+${pct(spread)}` : pct(spread);
+    const spreadChip  = `<span class="price-spread ${spreadClass}">${spreadText}</span>`;
+
+    // Profit color
+    const profitClass  = bestStrat.profit_pct > 0 ? 'profit-pos' : 'profit-neg';
+    const profitText   = bestStrat.profit_pct > 0
+      ? `+${bestStrat.profit_pct.toFixed(2)}%`
+      : `${bestStrat.profit_pct.toFixed(2)}%`;
+
+    return `
+    <tr class="${rowClass}">
+      <td>
+        <div class="market-title">
+          <a class="mkt-link" href="${k.url}" target="_blank" rel="noopener">
+            ${esc(trunc(k.title, 60))}<span class="platform-tag tag-k">K</span>
+          </a>
+        </div>
+        <div class="market-sub">
+          <a class="mkt-link" href="${pm.url}" target="_blank" rel="noopener">
+            ${esc(trunc(pm.title, 60))}<span class="platform-tag tag-pm">PM</span>
+          </a>
+        </div>
+      </td>
+      <td class="price-cell">
+        <div class="price-yes">${pct(k.yes_ask)}</div>
+        <div class="price-no">NO ${pct(k.no_ask)}</div>
+      </td>
+      <td class="price-cell">
+        <div class="price-yes">${pct(pm.yes_ask)}</div>
+        <div class="price-no">NO ${pct(pm.no_ask)}</div>
+      </td>
+      <td class="price-cell">
+        ${spreadChip}
+        <div class="vol-chip" style="margin-top:3px">K $${fmt(k.volume)}</div>
+      </td>
+      <td>
+        <span class="sim-bar" style="width:${Math.round(p.sim*40)}px"></span>
+        <span class="sim-val">${Math.round(p.sim*100)}%</span>
+      </td>
+      <td class="strategy-text">${esc(bestStrat.strategy)}</td>
+      <td>
+        <div class="profit-cell ${profitClass}">${profitText}</div>
+        <div class="vol-chip">per $1 notional</div>
+      </td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableBody').innerHTML = rows;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function trunc(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+function pct(v)      { return (v * 100).toFixed(1) + '¢'; }
+function fmtPnl(v)   { return v >= 0 ? `+${(v*100).toFixed(2)}¢` : `${(v*100).toFixed(2)}¢`; }
+function fmt(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return Math.round(n).toLocaleString();
+}
+</script>
+</body>
+</html>
