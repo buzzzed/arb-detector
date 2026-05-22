@@ -39,7 +39,7 @@ POLL_INTERVAL   = 30     # seconds between full refreshes (be kind to free APIs)
 MATCH_THRESHOLD = 0.28   # minimum combined similarity score to pair two markets
 MIN_ARB_PROFIT  = 0.003  # flag as arb if guaranteed profit > 0.3 % of notional
 MIN_VOLUME      = 10     # skip markets with < $10 lifetime volume
-MAX_PAGES       = 10     # API pages to fetch per platform per cycle
+MAX_PAGES       = 5      # API pages to fetch per platform per cycle
 
 # ── Title normalizer ───────────────────────────────────────────────────────────
 _STOP = {
@@ -283,12 +283,19 @@ async def _poll() -> None:
                 kalshi_raw, poly_raw = await asyncio.gather(
                     _fetch_kalshi(client), _fetch_poly(client)
                 )
-                kalshi = [x for m in kalshi_raw if (x := _norm_kalshi(m))]
-                poly   = [x for m in poly_raw   if (x := _norm_poly(m))]
-                pairs  = _match(kalshi, poly)
 
-                analyzed = [{**p, "arb": _arb(p["kalshi"], p["poly"])} for p in pairs]
-                analyzed.sort(key=lambda x: (not x["arb"]["has_arb"], -x["arb"]["best_profit_pct"]))
+                # Run the CPU-bound normalize → match → analyze pipeline in a
+                # worker thread so /health and /stream stay responsive on
+                # single-core hosts.
+                def _crunch():
+                    k  = [x for m in kalshi_raw if (x := _norm_kalshi(m))]
+                    p_ = [x for m in poly_raw   if (x := _norm_poly(m))]
+                    pp = _match(k, p_)
+                    out = [{**p, "arb": _arb(p["kalshi"], p["poly"])} for p in pp]
+                    out.sort(key=lambda x: (not x["arb"]["has_arb"], -x["arb"]["best_profit_pct"]))
+                    return k, p_, out
+
+                kalshi, poly, analyzed = await asyncio.to_thread(_crunch)
 
                 _state.update({
                     "ts"       : time.time(),
